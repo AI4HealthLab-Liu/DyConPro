@@ -19,6 +19,8 @@ MATLAB version 2013b or higher.
 ## Usage
 Command line tools. Some functions are stand-alone, some are dependencies, and some are both. Read the Input/Output information and Notes for each function file to learn how to use it. 
 
+Some functions require that you download and install additional matlab toolboxes. The afni_matlab toolbox will be needed, and some SPM functions, for reading BRIK/HEAD or nifti files, respectively. Additional DCP funcitons will also integrate with other toolboxes for high-level analyses.
+
 ## References
 Citing the toolbox:
 - Tobia, M. J., Hayashi, K., Ballard, G., Gotlib, I. H., & Waugh, C. E. (2017). Dynamic functional connectivity and individual differences in emotions during social stress. Human brain mapping, 38(12), 6185-6205.

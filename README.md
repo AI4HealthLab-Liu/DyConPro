@@ -13,7 +13,7 @@ Some of these newer functionalities, especially the gui, are, of course, a ongoi
 MATLAB version 2013b or higher.
 
 ## Usage
-
+Command line tools. Some functions are stand-alone, some are dependencies, and some are both. Read the Input/Output information and Notes for each files to learn how to use them. 
 
 ## References
 Citing the toolbox:

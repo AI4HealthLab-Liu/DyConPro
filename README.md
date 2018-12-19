@@ -3,7 +3,11 @@ DYnamic CONnectivity PROcessing (DCP) toolbox.
 
 MATLAB tools for computation, manipulation and processing of single-subject and group dynamic functional connectivity (dfc) tensors and matrices.  It includes a function for computing a time-varying, instantaneous measure of functional connectivity (function dcp_dcs; see [Tobia et al., 2017](http://onlinelibrary.wiley.com/doi/10.1002/hbm.23821/full)) and numerous other functions to scale, binarize, transform to matrices, and analyze (e.g., neurocognitive network correlations, block GLMs) dfc tensors.
 
-Recent update and first official release of DCP v1.1 (12/18/2018) now includes two example files to demo how to run some of the more intricate DCP functions. ALSO, now includes FC_SNAPSHOT, whic is a crude matlab workspace gui for easy viewing of FC matrices and dFC tensors in 3 viewing modes, (1) time-dependent matrices, (2) time-dependent circle graph, and (3) time-dependent brain rendering. Some of these newer functionalities are, of course, a ongoing WIP!
+Recent update and first official release of DCP v1.1 (12/18/2018) now includes many new functions and two example files to demo how to run some of the more intricate DCP functions, such as dcp_stepmoreg for denoising, or dcp_fast_ifc_s2b for whole-brain seed-based phase synchrony. Many new functions read and write AFNI-style BRIK/HEAD files, and some will accept nifti-2 files too.
+
+ALSO - now includes FC_SNAPSHOT, which is a crude matlab workspace gui for easy viewing of FC matrices and dFC tensors in 3 viewing modes, (1) time-dependent matrices, (2) time-dependent circle graph, and (3) time-dependent brain rendering. This is useful if you are exploring dFC tensors in matlab and want to view and scroll through time. It can scan the workspace for variables which you can then select to load/view in the gui. 
+
+Some of these newer functionalities, especially the gui, are, of course, a ongoing WIP!
 
 ## Requirements
 MATLAB version 2013b or higher.

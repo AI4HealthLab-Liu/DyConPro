@@ -23,7 +23,7 @@ Some functions require that you download and install additional matlab toolboxes
 
 ## References
 Citing the toolbox:
-- Tobia, M. J., Hayashi, K., Ballard, G., Gotlib, I. H., & Waugh, C. E. (2017). Dynamic functional connectivity and individual differences in emotions during social stress. Human brain mapping, 38(12), 6185-6205.
+- Tobia, M. J., Hayashi, K., Ballard, G., Gotlib, I. H., & Waugh, C. E. (2017). Dynamic functional connectivity and individual differences in emotions during social stress. Human Brain Mapping, 38(12), 6185-6205.
 
 ## Support and Communication
 If you notice any bugs in the package, or would like to request features, please open an [issue](https://github.com/NBCLab/DyConPro/issues). We make no guarantee that we will incorporate requested changes, but we welcome any input and are happy to discuss.

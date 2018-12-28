@@ -25,7 +25,7 @@ function [BRIK_den,outstrc]=dcp_stepmoreg(Opts)
 % Opts.gsr=0; %perform GSR 0=no, 1=yes; It will be expanded with derivs. & squares
 % Opts.edgemask; %path to edgemask file
 % Opts.edgenum=24; % number of edgemask regressors to keep; default=24
-% Opts.remean=0; %Re-mean the data after denoising? 0=no, 1=yes
+% Opts.remean=0; %Re-mean the data after denoising? 0=no, 1=yes (adds regression intercept)
 % Opts.xvarsnorm=0; %Unit norm Xvars; 0=no, 1=yes
 % Opts.swthr=0; %apply bonferonni to stepwise threshold; 0=no, 1=yes
 % Opts.nostep=0; %perform regular regression instead of stepwise; 0=no, 1=yes

@@ -8,8 +8,6 @@ if ~exist('Fs','var')
     Fs=.5;
 end
 
-% cardiac_f=[];
-% resp_f=[];
 
 [~,rois]=size(X);
 

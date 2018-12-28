@@ -65,5 +65,4 @@ end
 
 mimf_dfc=mean(ifc_tens,4);
 
-% compute spectral entropy of mimf_dfc vs. randn signals
 

@@ -40,7 +40,6 @@ IMFmp=apitmemd(Xmp,sigs*2,'alpha',1);
 IMF=IMFmp(:,:,mf+1:end);
 IMF=IMF(:,:,1:td);
 
-keyboard
 
 [~,nimfs,~]=size(IMF);
 

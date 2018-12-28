@@ -7,7 +7,7 @@ function fd=dcp_buttfilt(x,order,LF,HF,Fs,ftype)
 % NOW WITH NOTCH FILTERING !! added 12/12/2018 MJT
 % 
 %  1. input x is time series data
-%  2. order is filter order; default = 6
+%  2. order is filter order; default = 4
 %  3. LF,HF are band stops
 %  4. fs is sampling frequency in Hz; e.g., 2 sec TR = .5 Hz
 %  5. ftype is a string; 'bandpass' or 'stop'

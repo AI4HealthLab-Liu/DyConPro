@@ -13,7 +13,7 @@ function [roi_tcs]=dcp_roi_timecourse_extract(data,mask,method,filt_pb,dtrnd)
 % 2. mask is string with path/filename+orig.BRIK with parcellation into N ROIs
 % 3. method==1 is average signal in an roi; method==2 is first eigenvector
 % 4. filt_pb is filter passband [lf hf fs], e.g., [.01 .15 .5]; THIS WILL
-%     BANDPASS FILTER THE SIGNALS BEFORE TAKING THEIR REGIONAL AVERAGE
+%     BANDPASS FILTER THE SIGNALS BEFORE TAKING THEIR REGIONAL AVERAGE & AFTER (?) !!!
 % 
 % Outputs:
 % 1. roi_tcs_mean is a Time x ROIs matrix ready for dFC processing

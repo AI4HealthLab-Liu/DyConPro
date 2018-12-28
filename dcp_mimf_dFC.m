@@ -20,7 +20,7 @@ function [mimf_dfc,ifc_tens,IMF,imf_keep,imf_powspec]=dcp_mimf_dFC(X,w_bot,w_top
 %     you must download the code from:
 %     
 
-if ~exist('apitmemd.m','file') %|| ~exist('EMDLAB_Plugin','dir')
+if ~exist('apitmemd.m','file')
     error('This function requires the apitmemd.m function from Hemakom et al., 2014');
 end
 

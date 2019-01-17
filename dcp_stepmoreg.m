@@ -47,7 +47,7 @@ function [BRIK_den,outstrc]=dcp_stepmoreg(Opts)
 % NEW! NEW!! NEW!!! input option: Opts.outliers & Opts.filtxvars !!!! added 1/9/2019 mjt
 % Opts.outliers=; % 1=interpolate outliers; 0=don't interpolate outliers; 3=interpolate outliers and use framewise displacement to specify location of outliers
 % Opts.filtxvars=; %bandpass Xvars & data prior to regression? ~isfield=no; [lf hf fs]=perform bandpass filter
-%
+% Opts.ignoreTRs=; % number of TRs to drop from start of time series, if desired
 % 
 % Not yet implemented in this function:
 
@@ -87,6 +87,10 @@ cd(pathstr);
 [~,BRIK,HEAD,~]=BrikLoad(Opts.data);
 [~,MASK,~,~]=BrikLoad(Opts.mask);
 motion=load(Opts.moparams);
+if isfield(Opts,'ignoreTRs')
+    BRIK=BRIK(:,:,:,Opts.ignoreTRs+1:end);
+    motion=motion(Opts.ignoreTRs+1:end,:);
+end
 [xd,yd,zd,td]=size(BRIK);
 if isfield(Opts,'tissuemask')
     [~,TMASK,~,~]=BrikLoad(Opts.tissuemask); 
@@ -395,7 +399,7 @@ if isfield(Opts,'nodenoise') && Opts.nodenoise==0
     cplots=figure('visible','off');
     subplot(4,1,1);imagesc(zscore(BRIK_rs(:,this1))');colormap 'gray';caxis([-5 5]);colorbar('westoutside')
     subplot(4,1,2);imagesc(zscore(denoised)');colormap 'gray';caxis([-5 5]);colorbar('westoutside') % may need to replace denoised full with denoised
-    subplot(4,1,3);plot(ones(length([0 fd])).*Opts.fd_thr,'k--');hold on;plot([0 fd],'k','LineWidth',2);colorbar('westoutside')
+    subplot(4,1,3);plot(ones(length([0 fd])).*Opts.fd_thr,'k--');hold on;plot([0 fd],'k','LineWidth',2);xlim([0 td]);colorbar('westoutside')
     subplot(4,1,4);imagesc(zscore(noiseout)');colormap 'gray';caxis([-5 5]);colorbar('westoutside')
     saveas(cplots,[Opts.prefix,'_carpet_plots.jpg'],'jpg')
     clear cplots

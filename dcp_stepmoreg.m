@@ -5,6 +5,8 @@ function [BRIK_den,outstrc]=dcp_stepmoreg(Opts)
 % Dynamic Connectivity Processing (DCP) toolbox
 % DCP_v1.1 release 12/18/2018
 % 
+% Updated 1/9/2019 mjt
+% 
 % function [BRIK_den,outstrc]=dcp_stepmoreg(Opts)
 % 
 % This function requires data, a brain mask and motion params file.
@@ -14,6 +16,9 @@ function [BRIK_den,outstrc]=dcp_stepmoreg(Opts)
 % Opts.mask=; %path to mask file
 % Opts.fwhm_xyz=; %path to file of FWHM_xyz time series output from afni's 3dLocalstat -FWHM
 % Opts.moparams=; %path to motion params file
+% Opts.notchfiltmo=; [order,LF,HF,Fs] %apply notch filter to motion params BEFORE all other computations %added 1/8/2019 mjt
+%   NOTE: LF & HF are the edges of the stopband, i.e., to notch filter motion
+%   params .07-.12 use these as input values for LF and HF
 % Opts.brikout=1; %write out a BRIK file? 0=no, 1=yes
 % Opts.prefix='testsub'; %name of output BRIK file
 % Opts.framewised=1; %compute framewise displacement? 0=no, 1=yes
@@ -25,27 +30,30 @@ function [BRIK_den,outstrc]=dcp_stepmoreg(Opts)
 % Opts.gsr=0; %perform GSR 0=no, 1=yes; It will be expanded with derivs. & squares
 % Opts.edgemask; %path to edgemask file
 % Opts.edgenum=24; % number of edgemask regressors to keep; default=24
-% Opts.remean=0; %Re-mean the data after denoising? 0=no, 1=yes (adds regression intercept)
+% Opts.remean=0; %Re-mean the data after denoising? 0=no, 1=yes
 % Opts.xvarsnorm=0; %Unit norm Xvars; 0=no, 1=yes
+% Opts.nomoregress=; 0=use motion; 1=do not use motion
 % Opts.swthr=0; %apply bonferonni to stepwise threshold; 0=no, 1=yes
 % Opts.nostep=0; %perform regular regression instead of stepwise; 0=no, 1=yes
 % Opts.tissuemask=''; %path to mask file with CSF=1, GM=2, WM=3;
 % Opts.voxcorr=0; %compute voxel-level pairwise correlations to get RMS global correlations; 0=no, 1=yes; will add 30 minutes to your processing time
 % Opts.compregs=0; % take first N eigenvectors from svd of Xvars matrix; 0=no, N=yes & how many (N is a number > 0)
-% Opts.Fs=; % sampling frequency in Hertz .5 Hz is 2 sec TR
-% Opts.fbands=; % fbands is a vector of [fbot ftop] to keep/remove;
+% Opts.Fs=; % sampling frequency in Hertz .5 Hz is 2 sec TR; used to create bandpass filter nuisregs
+% Opts.fbands=; % fbands is a vector of [fbot ftop] to keep/remove; used to create bandpass filter nuisregs
 %   NOTE: addition of bport to Xvars will occur after all other Xvars have been
 %   prepared (i.e., bport is not included in compregs, but is concatenated to
 %   the end of the compregs Xvars mat)
+% 
+% NEW! NEW!! NEW!!! input option: Opts.outliers & Opts.filtxvars !!!! added 1/9/2019 mjt
+% Opts.outliers=; % 1=interpolate outliers; 0=don't interpolate outliers; 3=interpolate outliers and use framewise displacement to specify location of outliers
+% Opts.filtxvars=; %bandpass Xvars & data prior to regression? ~isfield=no; [lf hf fs]=perform bandpass filter
 %
 % 
 % Not yet implemented in this function:
-% Opts.eigvecdegree=1; % compute eigenvector centrality instead of global correlations
-% Opts.nomoregs=0; % do NOT use motion regressors; 0=no (use them), 1=yes (don't use them)
+
 % Opts.maskwmval=3;
 % Opts.maskcsfval=1;
 % Opts.maskgmval=2;
-% Opts.filtxvars=0; %bandpass Xvars & data prior to regression? 0=no, 1=yes
 % Opts.physiosigs=; %physiological nuisance regressors
 % 
 % Outputs:
@@ -55,14 +63,17 @@ function [BRIK_den,outstrc]=dcp_stepmoreg(Opts)
 % Notes:
 % 1. Xvars order is: gsr, expanded motion params, expanded tissue regressors (optional), edge
 %     regressors (assuming all options are ==1), additional regressors (if any), bandpass filter
-%     regressors & fwhm_xyz are the last three regressors to be catenated
-%     to Xvars
+%     regressors & fwhm_xyz are the last three regressors to be catenated to Xvars
 % 2. Subtract orig data - denoised data to obtain the 'fitted noise signals'
 %     NEW !!! Noisemodel is now an automatic output.
 % 3. Entering a tissuemask will generate 1 expanded WM and 1 expanded CSF regressors (8 additional regressors)
 % 4. Opts.fwhm_xyz could actually be a volume of any voxel specific regressors (No, not implemented to do this)
+% 5. Can now apply a notch filter to motion params; there are no defaults for this !!
+% 6. Can now remove outliers with either of 2 methods (1 or 3): method 1 will detect based on 3*MAD; 
+%     method 3 will use thresholded FD to specify outliers, then will run it again using 3*MAD
+% 7. Now includes linear AND cubic AND more detrending for all nuisregs and data !!! (added 1/9/2019 mjt)
 % 
-
+% 
 
 if ~exist('BrikLoad.m','file') || ~exist('WriteBrik.m','file') || ~exist('afni_matlab','dir')
     error('This function requires the afni_matlab toolbox for the BrikLoad and WriteBrik functions.');
@@ -71,10 +82,8 @@ if isfield(Opts,'nostep') && Opts.nostep==1
     warning('off', 'stats:pvaluedw:ExactUnavailable');
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-[pathstr,filename,extens]=fileparts(Opts.data);
-if strcmp(extens,'.gz')
-    filename=filename(1:end-4);
-end
+[pathstr,~,~]=fileparts(Opts.data);
+cd(pathstr);
 [~,BRIK,HEAD,~]=BrikLoad(Opts.data);
 [~,MASK,~,~]=BrikLoad(Opts.mask);
 motion=load(Opts.moparams);
@@ -94,8 +103,8 @@ if isfield(Opts,'tissuemask')
 %             end
 %         end
 %     end
-%     WMerode=dilated-WM;WMerode(WMerode<0)=0;
-%     CSFerode=dilated-CSF;CSFerode(CSFerode<0)=0;
+%     WMerode=WM-dilated;WMerode(WMerode<0)=0;
+%     CSFerode=CSF-dilated;CSFerode(CSFerode<0)=0;
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if isfield(Opts,'fwhm_xyz') && ~isempty(Opts.fwhm_xyz)
@@ -105,15 +114,18 @@ if isfield(Opts,'fwhm_xyz') && ~isempty(Opts.fwhm_xyz)
     FWHMz=FWHMxyz(:,:,:,3:3:end);
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-dmo=diff(motion);
 [~,cm]=size(motion);
 if cm~=6
     motion=motion';
 end
+if isfield(Opts,'notchfiltmo') && ~isempty(Opts.notchfiltmo)
+    motion=dcp_buttfilt(motion,Opts.notchfiltmo(1),Opts.notchfiltmo(2),Opts.notchfiltmo(3),Opts.notchfiltmo(4),'stop');
+end
+dmo=diff(motion);
 if isfield(Opts,'framewised') && Opts.framewised==1
     fd=zeros(1,size(motion,1)-1);
     for tstep=1:size(motion,1)-1
-        fd(:,tstep)=norm(dmo(tstep,:)); % afni style FD=sqrt(sum(motion^2))
+        fd(:,tstep)=norm(dmo(tstep,:)); % afni style FD=sqrt(sum(diffmotion^2))
     end
 else
     fd=[];
@@ -148,6 +160,9 @@ if isfield(Opts,'F24') && Opts.F24==1
 else
     Xvars=motion;
 end
+if isfield(Opts,'nomoregress') && Opts.nomoregress==1
+    Xvars=[];
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if isfield(Opts,'tissuemask')
 % % % % % % % % % % % % % % % %     FIX MASKS TO USE ERODED TISSUE MASKS
@@ -165,14 +180,6 @@ else
     csfvars=[];
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if isfield(Opts,'gsr') && Opts.gsr==1
-   gsig=mean(BRIK_mask,2);
-   dgsig=[0;diff(gsig)];
-   Xvars=[gsig dgsig gsig.^2 dgsig.^2 Xvars];
-else
-    gsig=[];
-end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if isfield(Opts,'edgemask') && ~isempty(Opts.edgemask)
    [~,emask,~,~]=BrikLoad(Opts.edgemask);
    emask_rs=reshape(emask,1,numel(emask));
@@ -181,8 +188,10 @@ if isfield(Opts,'edgemask') && ~isempty(Opts.edgemask)
    [u,~,~]=svd(zscore(emaskdat));
    if ~isfield(Opts,'edgenum') || isempty(Opts.edgenum)
        edgenum=24;
+   else
+       edgenum=Opts.edgenum;
    end
-   edgevars=u(:,1:Opts.edgenum);
+   edgevars=u(:,1:edgenum);
    Xvars=[Xvars edgevars];
 else 
     edgevars=[];
@@ -216,21 +225,43 @@ if isfield(Opts,'compregs') && ~isempty(Opts.compregs)
     Xvars=u(:,1:Opts.compregs);
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if isfield(Opts,'outliers') && Opts.outliers==1 
+    [BRIK_mask,outremstructB]=dcp_outliers(BRIK_mask,[],[],[]); % use 3*mad to find outliers and interpolate with pchip
+    outremstructA=[];
+end
+if isfield(Opts,'outliers') && Opts.outliers==3
+    [BRIK_mask,outremstructA]=dcp_outliers(BRIK_mask,[],[],censor); % use fd to find outliers and interpolate with pchip
+    [BRIK_mask,outremstructB]=dcp_outliers(BRIK_mask,[],[],[]); % use 3*mad to find outliers and interpolate with pchip
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if isfield(Opts,'gsr') && Opts.gsr==1
+   gsig=mean(BRIK_mask,2);
+   dgsig=[0;diff(gsig)];
+   Xvars=[gsig dgsig gsig.^2 dgsig.^2 Xvars];
+else
+    gsig=[];
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if isfield(Opts,'xvarsnorm') && Opts.xvarsnorm==1    
     for loop1=1:size(Xvars,2)
         Xvars(:,loop1)=Xvars(:,loop1)./norm(Xvars(:,loop1));
     end
 end
-Xvars=detrend(Xvars); %Xvars & data are detrended
-% bandpass filter Xvars & data ?
+Xvars=dcp_nonlin_detrend(Xvars,2); %Xvars & data are linear & cubic detrended, but only Xvars here
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if isfield(Opts,'filtxvars') % data MUST be filtered if Xvars are filtered
+    Xvars=dcp_buttfilt(Xvars,3,Opts.filtxvars(1),Opts.filtxvars(2),Opts.filtxvars(3));
+    BRIK_mask=dcp_buttfilt(BRIK_mask,3,Opts.filtxvars(1),Opts.filtxvars(2),Opts.filtxvars(3));
+end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if isfield(Opts,'Fs') && isfield(Opts,'fbands')
     [bport]=dcp_bpfilt_nuisregs(td,Opts.Fs,td/Opts.Fs,Opts.fbands(1),Opts.fbands(2));
     Xvars=[Xvars bport];
 end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % keepxvars=ones(1,size(Xvars,2));
 % keepxvars=zeros(1,size(Xvars,2));
-% % % % % % % % Xvars=fliplr(Xvars);
+% Xvars=fliplr(Xvars);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Stepwise selection of nuisance variables & denoising with linear regression
 if isfield(Opts,'nodenoise') && Opts.nodenoise==0
@@ -245,7 +276,7 @@ if isfield(Opts,'nodenoise') && Opts.nodenoise==0
             if isfield(Opts,'fwhm_xyz') && ~isempty(Opts.fwhm_xyz)
                Xvars(:,end-2:end)=[Fx_mask(:,vox) Fy_mask(:,vox) Fz_mask(:,vox)]; 
             end
-            tempsig=detrend(BRIK_mask(:,vox));
+            tempsig=dcp_nonlin_detrend(BRIK_mask(:,vox),2);
             [modelb,~,ppp,~,stats,~,history]=stepwisefit(Xvars,tempsig,'display','off','scale','on','penter',swthr); %,'keep',keepxvars);
             denoised(:,vox)=stats.yr; % this is denoised signal
             noiseout(:,vox)=tempsig-stats.yr; % this is the noise model signal
@@ -284,7 +315,7 @@ if isfield(Opts,'nodenoise') && Opts.nodenoise==0
             betasout(3:4:4*length(modelb),vox)=stats.TSTAT;
             betasout(4:4:4*length(modelb),vox)=1-ppp; % this is all 1-pvals for all betas in the model
             [length(this1) length(this1)-vox]
-        end 
+        end        
         denoised_full=zeros(td,xd*yd*zd);
         denoised_full(:,this1)=denoised;
         noise_full=zeros(td,xd*yd*zd);
@@ -318,7 +349,7 @@ if isfield(Opts,'nodenoise') && Opts.nodenoise==0
             if isfield(Opts,'fwhm_xyz') && ~isempty(Opts.fwhm_xyz)
                Xvars(:,end-2:end)=[Fx_mask(:,vox) Fy_mask(:,vox) Fz_mask(:,vox)]; 
             end
-            tempsig=detrend(BRIK_mask(:,vox));
+            tempsig=dcp_nonlin_detrend(BRIK_mask(:,vox),2);
             stats=regstats(zscore(tempsig),zscore(Xvars),'linear');
             denoised(:,vox)=stats.r;
             noiseout(:,vox)=stats.yhat;
@@ -328,6 +359,17 @@ if isfield(Opts,'nodenoise') && Opts.nodenoise==0
             betasout(3:3:(3*size(Xvars,2))+3,vox)=1-stats.tstat.pval;
             [length(this1) length(this1)-vox]
         end
+        
+%       EXPERIMENTAL; do not use
+%         if isfield(Opts,'outliers') && Opts.outliers==1 
+%             [denoised,outremstructB]=dcp_outliers(denoised,[],[],[]); % use 3*mad to find outliers and interpolate with pchip
+%             outremstructA=[];
+%         end
+%         if isfield(Opts,'outliers') && Opts.outliers==3
+%             [denoised,outremstructA]=dcp_outliers(denoised,[],[],censor); % use fd to find outliers and interpolate with pchip
+%             [denoised,outremstructB]=dcp_outliers(denoised,[],[],[]); % use 3*mad to find outliers and interpolate with pchip
+%         end
+        
         denoised_full=zeros(td,xd*yd*zd);
         denoised_full(:,this1)=denoised;
         noise_full=zeros(td,xd*yd*zd);
@@ -336,7 +378,7 @@ if isfield(Opts,'nodenoise') && Opts.nodenoise==0
             for loop1=1:size(denoised_full,1)
                 denoised_full(loop1,:)=bsxfun(@plus,remeaner,denoised_full(loop1,:));
             end
-        end
+        end        
         BRIK_den=reshape(denoised_full',xd,yd,zd,td);  
         betasout(isnan(betasout))=0;betasout(isinf(betasout))=0;
         bfull=zeros(size(betasout,1),xd*yd*zd);bfull(:,this1)=betasout;
@@ -351,8 +393,8 @@ end
 % GENERATE CARPET PLOTS: Pre-/post denoising, fd, noisemodel
 if isfield(Opts,'nodenoise') && Opts.nodenoise==0
     cplots=figure('visible','off');
-    subplot(4,1,1);imagesc(zscore(BRIK_mask)');colormap 'gray';caxis([-5 5]);colorbar('westoutside')
-    subplot(4,1,2);imagesc(zscore(denoised)');colormap 'gray';caxis([-5 5]);colorbar('westoutside')
+    subplot(4,1,1);imagesc(zscore(BRIK_rs(:,this1))');colormap 'gray';caxis([-5 5]);colorbar('westoutside')
+    subplot(4,1,2);imagesc(zscore(denoised)');colormap 'gray';caxis([-5 5]);colorbar('westoutside') % may need to replace denoised full with denoised
     subplot(4,1,3);plot(ones(length([0 fd])).*Opts.fd_thr,'k--');hold on;plot([0 fd],'k','LineWidth',2);colorbar('westoutside')
     subplot(4,1,4);imagesc(zscore(noiseout)');colormap 'gray';caxis([-5 5]);colorbar('westoutside')
     saveas(cplots,[Opts.prefix,'_carpet_plots.jpg'],'jpg')
@@ -365,7 +407,7 @@ if isfield(Opts,'nodenoise') && Opts.nodenoise==0
     DVARS=diff(rms(denoised,2));
     [rr,pp]=corr(fd',DVARS);
     DVARSQC=[rr pp];
-    [rr,pp]=corr(fd',diff(rms(BRIK_mask,2)));
+    [rr,pp]=corr(fd',diff(rms(BRIK_rs(:,this1),2))); %maybe should be BRIK_mask
     DVARSMC=[rr pp];
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -400,6 +442,10 @@ if isfield(Opts,'nodenoise') && Opts.nodenoise==0 && isfield(Opts,'voxcorr') && 
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 outstrc.inputs=Opts;
+if isfield(Opts,'outliers') && ~isempty(Opts.outliers)
+    outstrc.outliersin=outremstructA;
+    outstrc.outliersB=outremstructB;
+end
 outstrc.fd=fd;
 outstrc.fd_avg=mean(fd);
 outstrc.globalsig=gsig;
